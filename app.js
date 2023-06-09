@@ -4,7 +4,8 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const _ = require('lodash');
-var posts = [];
+const mongoose = require('mongoose');
+let posts = [];
 
 const homeStartingContent = "Lacus vel facilisis volutpat est velit egestas dui id ornare. Semper auctor neque vitae tempus quam. Sit amet cursus sit amet dictum sit amet justo. Viverra tellus in hac habitasse. Imperdiet proin fermentum leo vel orci porta. Donec ultrices tincidunt arcu non sodales neque sodales ut. Mattis molestie a iaculis at erat pellentesque adipiscing. Magnis dis parturient montes nascetur ridiculus mus mauris vitae ultricies. Adipiscing elit ut aliquam purus sit amet luctus venenatis lectus. Ultrices vitae auctor eu augue ut lectus arcu bibendum at. Odio euismod lacinia at quis risus sed vulputate odio ut. Cursus mattis molestie a iaculis at erat pellentesque adipiscing.";
 const aboutContent = "Hac habitasse platea dictumst vestibulum rhoncus est pellentesque. Dictumst vestibulum rhoncus est pellentesque elit ullamcorper. Non diam phasellus vestibulum lorem sed. Platea dictumst quisque sagittis purus sit. Egestas sed sed risus pretium quam vulputate dignissim suspendisse. Mauris in aliquam sem fringilla. Semper risus in hendrerit gravida rutrum quisque non tellus orci. Amet massa vitae tortor condimentum lacinia quis vel eros. Enim ut tellus elementum sagittis vitae. Mauris ultrices eros in cursus turpis massa tincidunt dui.";
@@ -17,14 +18,25 @@ app.set('view engine', 'ejs');
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(express.static("public"));
 
+mongoose.connect('mongodb://localhost:27017/blogDB');
 
-app.get("/", function(req, res){
-  
-  res.render("home", {homecontent:homeStartingContent, numPosts:posts})
-})
+const blogSchema = {
+  title: String,
+  content: String
+};
+
+const blog = mongoose.model('blog', blogSchema);
+
+
+app.get("/", function (req, res) {
+  // Fetch all blog documents from the database
+  blog.find({}).then(function(blogs){
+    res.render("home", {homecontent: homeStartingContent, numPosts:blogs});
+  });
+});
 
 app.get("/home", function(req, res){
-  res.render("home", {homecontent:homeStartingContent})
+  res.render("home", {homecontent:homeStartingContent, numPosts: posts})
 })
 
 app.get("/about", function(req, res){
@@ -41,34 +53,40 @@ app.get("/compose", function(req, res){
   console.log(req.body);
 })
 
-app.post("/compose", function(req, res){
+app.post("/compose", async function(req, res){
   // console.log(req.body.title1, req.body.post1);
-  var newpost = {
+  // const newpost = {
+  //   title: req.body.title1,
+  //   post:req.body.post1
+  // };
+  // posts.push(newpost);
+
+  const post = new blog({
     title: req.body.title1,
-    post:req.body.post1
-  };
-  posts.push(newpost);
-  // res.render("home", {homecontent: homeStartingContent, numPosts:posts});
+    content: req.body.post1
+  })
+  await post.save();
   res.redirect("/");
   // console.log(posts);
 })
 
-
-app.get("/posts/:go", function(req, res){
-  // console.log(req.params);
-  // console.log(posts);
-  posts.forEach(function(post){
-    if(_.lowerCase(post.title) === _.lowerCase(req.params.go)){
-      console.log("found");
-      
-      res.render("post" , {heading: post.title, para:post.post});
-      res.redirect("/post")
-    }
-    else{
-      console.log("not found");
-    }
-  })
+app.post("/composebtn", function(req, res){
+  res.redirect("/compose");
 })
+
+app.get("/posts/:postId", async function(req, res){
+  const renderPostId = req.params.postId;
+
+  try {
+    const post = await blog.findById(renderPostId);
+    res.render("post", {heading: post.title, para: post.content});
+  } catch (err) {
+    console.error(err);
+    // Handle the error appropriately
+  }
+});
+
+
 
 app.listen(3009, function() {
   console.log("Server started on port 3009");
